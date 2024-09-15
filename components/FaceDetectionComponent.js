@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   View,
-  Button,
+  Pressable,
   Image,
   Text,
   Platform,
@@ -157,16 +157,18 @@ const FaceDetectionComponent = ({
     addManualFace(newManualFace); // Notify parent component about new face
   };
 
-  const handleManualFaceDataChange = (index, data) => {
-    // Update the specific manual face's completion status
-    const isComplete = Object.values(data).every((field) => field.trim() !== "");
-    setManualFaces((prevFaces) =>
-      prevFaces.map((face, i) =>
-        i === index ? { ...face, isComplete: isComplete } : face
-      )
-    );
-    onManualFaceDataChange(data); // Propagate changes to parent component
-  };
+  // const handleManualFaceDataChange = (index, data) => {
+  //   // Update the specific manual face's completion status
+  //   const isComplete = Object.values(data).every(
+  //     (field) => field.trim() !== ""
+  //   );
+  //   setManualFaces((prevFaces) =>
+  //     prevFaces.map((face, i) =>
+  //       i === index ? { ...face, isComplete: isComplete } : face
+  //     )
+  //   );
+  //   onManualFaceDataChange(data); // Propagate changes to parent component
+  // };
 
   const removeManualFace = (index) => {
     setManualFaces((prevFaces) => prevFaces.filter((_, i) => i !== index));
@@ -179,11 +181,13 @@ const FaceDetectionComponent = ({
 
   return (
     <View style={styles.container}>
-      <Button
-        title="Upload Image"
+      <Pressable
+        style={styles.button}
         onPress={handleImageUpload}
         disabled={isAnalyzing}
-      />
+      >
+        <Text style={styles.buttonText}>Upload Image</Text>
+      </Pressable>
       {imageUri && (
         <View style={{ position: "relative" }}>
           {Platform.OS === "web" ? (
@@ -220,7 +224,7 @@ const FaceDetectionComponent = ({
             const scaleX = imageWidth / imageDimensions.width;
             const scaleY = imageHeight / imageDimensions.height;
             return (
-              <div
+              <View
                 key={index}
                 style={{
                   position: "absolute",
@@ -250,7 +254,7 @@ const FaceDetectionComponent = ({
             const scaleX = imageWidth / imageDimensions.width;
             const scaleY = imageHeight / imageDimensions.height;
             return (
-              <div
+              <View
                 key={`manual-${index}`}
                 style={{
                   position: "absolute",
@@ -275,7 +279,7 @@ const FaceDetectionComponent = ({
                 }}
               >
                 {/* Delete Button for Manual Faces */}
-                <button
+                <Pressable
                   style={{
                     position: "absolute",
                     top: 0,
@@ -288,14 +292,14 @@ const FaceDetectionComponent = ({
                     padding: "2px 5px",
                     zIndex: 1,
                   }}
-                  onClick={(e) => {
+                  onPress={(e) => {
                     e.stopPropagation(); // Prevent triggering the face click handler
                     removeManualFace(index); // Remove the manual face
                   }}
                 >
-                  X
-                </button>
-              </div>
+                  <Text>X</Text>
+                </Pressable>
+              </View>
             );
           })}
         </View>
@@ -310,6 +314,16 @@ const FaceDetectionComponent = ({
 };
 
 const styles = StyleSheet.create({
+  button: {
+    backgroundColor: "#007BFF",
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     alignItems: "center",

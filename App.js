@@ -1,5 +1,10 @@
 import React, { useState, useContext } from "react";
-import { View, StyleSheet, ScrollView, Button, Text } from "react-native";
+import {
+  StyleSheet,
+  ScrollView,
+  Text,
+  Pressable,
+} from "react-native";
 import FaceDetectionComponent from "./components/FaceDetectionComponent";
 import FaceForm from "./components/FaceForm"; // Import FaceForm
 import { DataProvider } from "./context/DataContext"; // Import DataContext
@@ -71,11 +76,14 @@ const App = () => {
 
   const generateCaption = () => {
     // Function to generate AP style photo caption
-    const formattedDate = new Date(photoDetails.date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    const formattedDate = new Date(photoDetails.date).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }
+    );
 
     const facesDescriptions = facesData
       .map((face) => {
@@ -86,8 +94,14 @@ const App = () => {
       })
       .join("; ");
 
-    const caption = `${facesDescriptions} ${photoDetails.actionDescription ? `, ${photoDetails.actionDescription}` : ""} at ${photoDetails.city}, ${photoDetails.state}, on ${formattedDate}. ${photoDetails.photoContext ? photoDetails.photoContext : ""}`;
-    
+    const caption = `${facesDescriptions} ${
+      photoDetails.actionDescription
+        ? `, ${photoDetails.actionDescription}`
+        : ""
+    } at ${photoDetails.city}, ${photoDetails.state}, on ${formattedDate}. ${
+      photoDetails.photoContext ? photoDetails.photoContext : ""
+    }`;
+
     setCaption(caption); // Set the generated caption to state
   };
 
@@ -108,7 +122,9 @@ const App = () => {
           onPhotoDetailsChange={handlePhotoDetailsChange} // Pass handler for photo details change
         />
       )}
-      <Button title="Generate Caption" onPress={generateCaption} />
+      <Pressable style={styles.button} onPress={generateCaption}>
+        <Text style={styles.buttonText}>Generate Caption</Text>
+      </Pressable>
       {caption ? <Text style={styles.captionText}>{caption}</Text> : null}
     </ScrollView>
   );
@@ -124,6 +140,16 @@ const AppWithProvider = () => (
 export default AppWithProvider;
 
 const styles = StyleSheet.create({
+  button: {
+    backgroundColor: "#007BFF",
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     alignItems: "center",
