@@ -1,10 +1,5 @@
 import React, { useState, useContext } from "react";
-import {
-  StyleSheet,
-  ScrollView,
-  Text,
-  Pressable,
-} from "react-native";
+import { StyleSheet, ScrollView, Text, Pressable } from "react-native";
 import FaceDetectionComponent from "./components/FaceDetectionComponent";
 import FaceForm from "./components/FaceForm"; // Import FaceForm
 import { DataProvider } from "./context/DataContext"; // Import DataContext
@@ -31,6 +26,7 @@ const App = () => {
         lastName: "",
         unit: "",
         dutyTitle: "",
+        isComplete: false,
       }))
     );
   };
@@ -62,6 +58,19 @@ const App = () => {
         ...updatedFacesData[selectedFaceIndex],
         [field]: value, // Allow spaces
       };
+
+      const isComplete = Object.values(
+        updatedFacesData[selectedFaceIndex]
+      ).every((field) => field !== "");
+      updatedFacesData[selectedFaceIndex] = {
+        ...updatedFacesData[selectedFaceIndex],
+        isComplete: isComplete, // Allow spaces
+      };
+
+      console.log(
+        `Updating Face ${selectedFaceIndex + 1}`,
+        updatedFacesData[selectedFaceIndex]
+      );
       return updatedFacesData;
     });
   };
@@ -110,8 +119,8 @@ const App = () => {
       <FaceDetectionComponent
         onFacesDetected={handleFacesDetected}
         onFaceClick={onFaceClick} // Pass the onFaceClick function as a prop
-        facesData={facesData} // Pass facesData to FaceDetectionComponent
         addManualFace={addManualFace} // Pass addManualFace function to handle manual faces
+        facesIdentityData={facesData}
       />
       {selectedFaceIndex !== null && (
         <FaceForm

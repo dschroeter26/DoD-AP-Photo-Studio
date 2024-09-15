@@ -16,7 +16,7 @@ const FaceDetectionComponent = ({
   onFacesDetected,
   onFaceClick,
   addManualFace,
-  onManualFaceDataChange, // New prop to handle manual face form data changes
+  facesIdentityData,
 }) => {
   const [imageUri, setImageUri] = useState(null);
   const [faces, setFaces] = useState([]);
@@ -25,7 +25,7 @@ const FaceDetectionComponent = ({
     height: 300,
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false); // State to track if analysis is in progress
-  const [selectedFaceIndex, setSelectedFaceIndex] = useState(null); // State to track selected face
+  const [selectedFaceIndex, setSelectedFaceIndex] = useState(0); // State to track selected face
 
   const [manualFaces, setManualFaces] = useState([]); // Store manually created faces
   const [largestFaceBox, setLargestFaceBox] = useState(null); // Store the size of the largest detected face
@@ -150,25 +150,12 @@ const FaceDetectionComponent = ({
       y: tapY - largestFaceBox.height / 2,
       width: largestFaceBox.width,
       height: largestFaceBox.height,
-      isComplete: false, // Initially set to incomplete
+      // isComplete: false, // Initially set to incomplete
     };
 
     setManualFaces((prevFaces) => [...prevFaces, newManualFace]); // Add new manual face
     addManualFace(newManualFace); // Notify parent component about new face
   };
-
-  // const handleManualFaceDataChange = (index, data) => {
-  //   // Update the specific manual face's completion status
-  //   const isComplete = Object.values(data).every(
-  //     (field) => field.trim() !== ""
-  //   );
-  //   setManualFaces((prevFaces) =>
-  //     prevFaces.map((face, i) =>
-  //       i === index ? { ...face, isComplete: isComplete } : face
-  //     )
-  //   );
-  //   onManualFaceDataChange(data); // Propagate changes to parent component
-  // };
 
   const removeManualFace = (index) => {
     setManualFaces((prevFaces) => prevFaces.filter((_, i) => i !== index));
@@ -219,6 +206,7 @@ const FaceDetectionComponent = ({
               <ActivityIndicator size="large" color="#ffffff" />
             </View>
           )}
+          {/* Render Recognized Faces */}
           {faces.map((face, index) => {
             const { x, y, width, height } = face.detection.box;
             const scaleX = imageWidth / imageDimensions.width;
@@ -233,9 +221,11 @@ const FaceDetectionComponent = ({
                   width: width * scaleX,
                   height: height * scaleY,
                   border:
-                    selectedFaceIndex === index
+                    selectedFaceIndex === index //If selected make it blue
                       ? "2px solid blue"
-                      : "2px solid red", // Highlight selected face
+                      : facesIdentityData[index].isComplete
+                      ? "2px solid green" // Green when form data is complete
+                      : "2px solid red", // Initially red until data is filled
                   cursor: "pointer",
                   backgroundColor:
                     selectedFaceIndex === index
@@ -251,6 +241,7 @@ const FaceDetectionComponent = ({
           })}
           {/* Render Manually Drawn Faces */}
           {manualFaces.map((manualFace, index) => {
+            console.log("Drawing manual face box", manualFace);
             const scaleX = imageWidth / imageDimensions.width;
             const scaleY = imageHeight / imageDimensions.height;
             return (
@@ -265,13 +256,13 @@ const FaceDetectionComponent = ({
                   border:
                     selectedFaceIndex === faces.length + index
                       ? "2px solid blue" // Highlight manual face when selected
-                      : manualFace.isComplete
+                      : facesIdentityData[faces.length + index].isComplete
                       ? "2px solid green" // Green when form data is complete
                       : "2px solid orange", // Initially orange until data is filled
                   cursor: "pointer",
-                  backgroundColor: manualFace.isComplete
-                    ? "rgba(0, 255, 0, 0.2)" // Turn green when form data is complete
-                    : "rgba(255, 165, 0, 0.2)", // Orange background when incomplete
+                  // backgroundColor: facesIdentityData[faces.length + index].isComplete
+                  //   ? "rgba(0, 255, 0, 0.2)" // Turn green when form data is complete
+                  //   : "rgba(255, 165, 0, 0.2)", // Orange background when incomplete
                 }}
                 onClick={() => {
                   setSelectedFaceIndex(faces.length + index); // Set selected face index for manual face
