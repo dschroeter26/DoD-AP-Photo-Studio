@@ -33,9 +33,12 @@ const FaceDetectionComponent = ({
   useEffect(() => {
     const loadModels = async () => {
       try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+        // await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+        await faceapi.nets.ssdMobilenetv1.loadFromUri("/models");
+        await faceapi.nets.mtcnn.loadFromUri("/models");
         await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
         await faceapi.nets.faceRecognitionNet.loadFromUri("/models");
+        await faceapi.nets.ageGenderNet.loadFromUri("/models");
         console.log("Models loaded successfully");
       } catch (error) {
         console.error("Error loading models:", error);
@@ -93,26 +96,60 @@ const FaceDetectionComponent = ({
       img.onload = async () => {
         try {
           console.log("Image loaded for face detection.");
-          const options = new faceapi.TinyFaceDetectorOptions({
-            inputSize: 512,
-            scoreThreshold: 0.5,
+          // const options = new faceapi.TinyFaceDetectorOptions({
+          //   inputSize: 1024,
+          //   scoreThreshold: 0.4,
+          // });
+          const mtcnnOptions = new faceapi.MtcnnOptions({
+            // minFaceSize: 20,
+            // scaleFactor: 0.8,
+            // maxNumScales: 10,
+            minFaceSize: 100, // Increase for better performance
+            scaleFactor: 0.9, // Higher values improve speed but reduce accuracy
+            maxNumScales: 5, // Limit scales to control memory usage
+          });
+          const ssdMobilenetv1Options = new faceapi.SsdMobilenetv1Options({
+            minConfidence: 0.3, // Adjust this value as needed
           });
 
-          const detections = await faceapi
-            .detectAllFaces(img, options)
+          // Run MTCNN model
+          const mtcnnDetections = await faceapi
+            .detectAllFaces(img, mtcnnOptions)
             .withFaceLandmarks();
-          console.log("Detections:", detections);
-          setFaces(detections);
-          onFacesDetected(detections); // Pass detected faces to the parent component
+          console.log("mtcnnDetections", mtcnnDetections);
+
+          // Run SsdMobilenetv1 model
+          const ssdDetections = await faceapi
+            .detectAllFaces(img, ssdMobilenetv1Options)
+            .withFaceLandmarks();
+          console.log("ssdDetections", ssdDetections);
+
+          // const detections = await faceapi
+          //   .detectAllFaces(img, mtcnnOptions)
+          //   .detectAllFaces(img, ssdMobilenetv1Options)
+          //   // .detectAllFaces(img)
+          //   .withFaceLandmarks();
+
+          // Combine results
+          const combinedDetections = mergeDetections(
+            mtcnnDetections,
+            ssdDetections
+          );
+          console.log("Detections:", combinedDetections);
+          setFaces(combinedDetections);
+          onFacesDetected(combinedDetections); // Pass detected faces to the parent component
 
           // Find the largest face box
-          if (detections.length > 0) {
-            const largestBox = detections.reduce((largest, detection) => {
-              const { width, height } = detection.detection.box;
-              return width * height > largest.width * largest.height
-                ? detection.detection.box
-                : largest;
-            }, detections[0].detection.box);
+          if (combinedDetections.length > 0) {
+            const largestBox = combinedDetections.reduce(
+              (largest, detection) => {
+                const { width, height } = detection.detection.box;
+                return width * height > largest.width * largest.height
+                  ? detection.detection.box
+                  : largest;
+              },
+              combinedDetections[0].detection.box
+            );
             setLargestFaceBox(largestBox);
           }
 
@@ -123,6 +160,67 @@ const FaceDetectionComponent = ({
           setIsAnalyzing(false); // Stop analyzing
         }
       };
+
+      // Helper function to merge detections, avoiding duplicates
+      // function mergeDetections(mtcnnDetections, ssdDetections) {
+      //   const iouThreshold = 0.5; // Define IoU threshold to consider two boxes as the same
+      //   const combinedDetections = [...mtcnnDetections];
+
+      //   for (const detection of ssdDetections) {
+      //     if (
+      //       !combinedDetections.some(
+      //         (d) =>
+      //           faceapi.euclideanDistance(
+      //             d.detection.box,
+      //             detection.detection.box
+      //           ) < iouThreshold
+      //       )
+      //     ) {
+      //       combinedDetections.push(detection);
+      //     }
+      //   }
+      //   return combinedDetections;
+      // }
+
+      function mergeDetections(detections1, detections2, iouThreshold = 0.5) {
+        const mergedDetections = [...detections1];
+      
+        for (const det2 of detections2) {
+          const isMerged = mergedDetections.some((det1) => {
+            const iou = calculateIoU(det1.detection.box, det2.detection.box);
+            if (iou > iouThreshold) {
+              // Merge or skip, depending on your strategy
+              return true;
+            }
+            return false;
+          });
+      
+          if (!isMerged) {
+            mergedDetections.push(det2);
+          }
+        }
+      
+        return mergedDetections;
+      }
+
+      function calculateIoU(boxA, boxB) {
+        const xA = Math.max(boxA.x, boxB.x);
+        const yA = Math.max(boxA.y, boxB.y);
+        const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
+        const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
+      
+        // Compute the area of intersection
+        const intersectionArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+      
+        // Compute the area of both the prediction and ground-truth rectangles
+        const boxAArea = boxA.width * boxA.height;
+        const boxBArea = boxB.width * boxB.height;
+      
+        // Compute the IoU
+        const iou = intersectionArea / (boxAArea + boxBArea - intersectionArea);
+      
+        return iou;
+      }
 
       img.onerror = (err) => {
         console.error("Error loading image for face detection:", err);
