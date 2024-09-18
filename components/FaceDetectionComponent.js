@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as faceapi from "face-api.js";
+import { uploadImage } from "../services/apiService";
 
 const FaceDetectionComponent = ({
   onFacesDetected,
@@ -30,6 +31,8 @@ const FaceDetectionComponent = ({
   const [manualFaces, setManualFaces] = useState([]); // Store manually created faces
   const [largestFaceBox, setLargestFaceBox] = useState(null); // Store the size of the largest detected face
 
+  const [uploadResponse, setUploadResponse] = useState(null);
+
   useEffect(() => {
     const loadModels = async () => {
       try {
@@ -47,15 +50,22 @@ const FaceDetectionComponent = ({
     loadModels();
   }, []);
 
-  const base64ToBlobUrl = (base64Data) => {
-    const byteCharacters = atob(base64Data.split(",")[1]);
+  const base64ToBlob = (dataURI, contentType = "image/png") => {
+    const base64String = dataURI.split(",")[1]; // Ensure base64String is correctly extracted
+    const byteCharacters = atob(base64String);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
       byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
     const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: "image/png" });
-    return URL.createObjectURL(blob);
+    return new Blob([byteArray], { type: contentType });
+  };
+
+  const toFormData = (image) => {
+    const formData = new FormData();
+    const blob = base64ToBlob(image.uri, image.mimeType); // Ensure correct usage here
+    formData.append("image", blob, image.fileName);
+    return formData;
   };
 
   const handleImageUpload = async () => {
@@ -63,20 +73,29 @@ const FaceDetectionComponent = ({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
-      base64: true,
     });
 
     if (!result.canceled) {
       const { uri, width, height } = result.assets[0];
-      const base64Data = uri;
+      setImageUri(uri); // Set image URI for display
+      setImageDimensions({ width, height });
+      await detectFaces(uri); // Use `uri` to detect faces
 
-      if (base64Data) {
-        const blobUrl = base64ToBlobUrl(base64Data);
-        setImageUri(blobUrl);
-        setImageDimensions({ width, height });
-        await detectFaces(blobUrl);
-      } else {
-        console.error("Image URI is undefined or null");
+      try {
+        const { uri, mimeType, fileName } = result.assets[0];
+        console.log("Creating FormData with", { uri, mimeType, fileName });
+
+        const formData = toFormData({ uri, mimeType, fileName });
+        console.log("FormData created:", formData);
+
+        for (var pair of formData.entries()) {
+          console.log(pair[0] + ", " + pair[1]);
+        }
+
+        const apiResponse = await uploadImage(formData); // Upload as FormData
+        setUploadResponse(apiResponse);
+      } catch (error) {
+        console.error("Error uploading image:", error);
       }
     } else {
       console.log("ImagePicker was cancelled");
@@ -184,7 +203,7 @@ const FaceDetectionComponent = ({
 
       function mergeDetections(detections1, detections2, iouThreshold = 0.5) {
         const mergedDetections = [...detections1];
-      
+
         for (const det2 of detections2) {
           const isMerged = mergedDetections.some((det1) => {
             const iou = calculateIoU(det1.detection.box, det2.detection.box);
@@ -194,12 +213,12 @@ const FaceDetectionComponent = ({
             }
             return false;
           });
-      
+
           if (!isMerged) {
             mergedDetections.push(det2);
           }
         }
-      
+
         return mergedDetections;
       }
 
@@ -208,17 +227,17 @@ const FaceDetectionComponent = ({
         const yA = Math.max(boxA.y, boxB.y);
         const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
         const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
-      
+
         // Compute the area of intersection
         const intersectionArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
-      
+
         // Compute the area of both the prediction and ground-truth rectangles
         const boxAArea = boxA.width * boxA.height;
         const boxBArea = boxB.width * boxB.height;
-      
+
         // Compute the IoU
         const iou = intersectionArea / (boxAArea + boxBArea - intersectionArea);
-      
+
         return iou;
       }
 
@@ -398,6 +417,7 @@ const FaceDetectionComponent = ({
           ? `Faces detected: ${faces.length + manualFaces.length}`
           : "No faces detected"}
       </Text>
+      {uploadResponse && <Text>{JSON.stringify(uploadResponse)}</Text>}
     </View>
   );
 };
