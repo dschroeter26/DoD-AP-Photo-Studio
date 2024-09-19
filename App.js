@@ -15,20 +15,12 @@ const App = () => {
     photoContext: "", // Context of the photo
   });
   const [caption, setCaption] = useState(""); // State to store the generated caption
+  // const [recognizedFaces, setRecognizedFaces] = useState(null); // State to store recognized faces
 
   const handleFacesDetected = (detections) => {
     // Initialize form data for each detected face
-    setFacesData(
-      detections.map(() => ({
-        serviceBranch: "",
-        rank: "",
-        firstName: "",
-        lastName: "",
-        unit: "",
-        dutyTitle: "",
-        isComplete: false,
-      }))
-    );
+    console.log("Set FacesData", detections);
+    setFacesData(detections);
   };
 
   const addManualFace = (manualFace) => {
@@ -47,7 +39,10 @@ const App = () => {
   };
 
   const onFaceClick = (index) => {
+    console.log("on face click index", index);
     setSelectedFaceIndex(index); // Set the selected face index
+    const clickedFace = facesData[index];
+    console.log("Current clicked face", clickedFace);
   };
 
   const handleInputChange = (field, value) => {
@@ -124,7 +119,7 @@ const App = () => {
       />
       {selectedFaceIndex !== null && (
         <FaceForm
-          faceData={facesData[selectedFaceIndex]} // Pass individual face data
+          faceData={facesData[selectedFaceIndex].backendData} // Pass individual face data
           onInputChange={(field, value) => handleInputChange(field, value)} // Pass input change handler
           index={selectedFaceIndex} // Pass index
           photoDetails={photoDetails} // Pass photo details

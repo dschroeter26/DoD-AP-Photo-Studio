@@ -12,6 +12,11 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as faceapi from "face-api.js";
 import { uploadImage } from "../services/apiService";
+import { toFormData } from "../utils/HttpUtils";
+import {
+  mergeFaceApiDetections,
+  combineFaceApiAndBackendDetections,
+} from "../utils/FacialRecognitionUtils";
 
 const FaceDetectionComponent = ({
   onFacesDetected,
@@ -20,7 +25,8 @@ const FaceDetectionComponent = ({
   facesIdentityData,
 }) => {
   const [imageUri, setImageUri] = useState(null);
-  const [faces, setFaces] = useState([]);
+  const [facialRecognitionApiDetections, setFacialRecognitionApiDetections] =
+    useState(null);
   const [imageDimensions, setImageDimensions] = useState({
     width: 300,
     height: 300,
@@ -30,8 +36,6 @@ const FaceDetectionComponent = ({
 
   const [manualFaces, setManualFaces] = useState([]); // Store manually created faces
   const [largestFaceBox, setLargestFaceBox] = useState(null); // Store the size of the largest detected face
-
-  const [uploadResponse, setUploadResponse] = useState(null);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -50,205 +54,161 @@ const FaceDetectionComponent = ({
     loadModels();
   }, []);
 
-  const base64ToBlob = (dataURI, contentType = "image/png") => {
-    const base64String = dataURI.split(",")[1]; // Ensure base64String is correctly extracted
-    const byteCharacters = atob(base64String);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
+  const onUploadImageClick = async () => {
+    try {
+      const imageResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      if (!imageResult.canceled) {
+        const { uri, width, height } = imageResult.assets[0];
+        setImageUri(uri); // Set image URI for display
+        setImageDimensions({ width, height });
+        setIsAnalyzing(true); // Start analyzing
+
+        // Step 1: Detect faces with face-api and store result in local variable
+        const faceApiResult = await detectFacesWithFaceApi(uri); // Use `uri` to detect faces
+
+        // Step 2: Call the backend API and store result in local variable
+        const backendFaceDetections = await callFacialRecognitionApi(
+          imageResult
+        ); // Get backend detections
+        setFacialRecognitionApiDetections(backendFaceDetections); // Update state
+
+        // Step 3: Combine both results using local variables
+        const combinedDetections = combineFaceApiAndBackendDetections(
+          faceApiResult, // Use the local result instead of state
+          backendFaceDetections // Use the local result instead of state
+        );
+
+        // Step 4: Pass the combined detections to the parent component
+        console.log(
+          "Combined FaceApi and Facial Recognition Detections",
+          combinedDetections
+        );
+        onFacesDetected(combinedDetections);
+
+        setIsAnalyzing(false); // End analyzing
+      } else {
+        console.log("ImagePicker was cancelled");
+        setIsAnalyzing(false);
+      }
+    } catch (error) {
+      console.error("Error during face detection:", error);
+      setIsAnalyzing(false); // End analyzing in case of error
     }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: contentType });
   };
 
-  const toFormData = (image) => {
-    const formData = new FormData();
-    const blob = base64ToBlob(image.uri, image.mimeType); // Ensure correct usage here
-    formData.append("image", blob, image.fileName);
-    return formData;
-  };
-
-  const handleImageUpload = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      const { uri, width, height } = result.assets[0];
-      setImageUri(uri); // Set image URI for display
-      setImageDimensions({ width, height });
-      await detectFaces(uri); // Use `uri` to detect faces
-
+  const detectFacesWithFaceApi = async (blobUrl) => {
+    return new Promise((resolve, reject) => {
       try {
-        const { uri, mimeType, fileName } = result.assets[0];
-        console.log("Creating FormData with", { uri, mimeType, fileName });
-
-        const formData = toFormData({ uri, mimeType, fileName });
-        console.log("FormData created:", formData);
-
-        for (var pair of formData.entries()) {
-          console.log(pair[0] + ", " + pair[1]);
+        if (!blobUrl) {
+          throw new Error("Image Blob URL is undefined or null");
         }
 
-        const apiResponse = await uploadImage(formData); // Upload as FormData
-        setUploadResponse(apiResponse);
+        const img = new window.Image();
+        img.src = blobUrl;
+
+        img.onload = async () => {
+          try {
+            console.log("Image loaded for face detection.");
+
+            const mtcnnOptions = new faceapi.MtcnnOptions({
+              minFaceSize: 100,
+              scaleFactor: 0.9,
+              maxNumScales: 5,
+            });
+            const ssdMobilenetv1Options = new faceapi.SsdMobilenetv1Options({
+              minConfidence: 0.3,
+            });
+
+            // Run MTCNN model
+            const mtcnnDetections = await faceapi
+              .detectAllFaces(img, mtcnnOptions)
+              .withFaceLandmarks();
+            console.log("mtcnnDetections", mtcnnDetections);
+
+            // Run SsdMobilenetv1 model
+            const ssdDetections = await faceapi
+              .detectAllFaces(img, ssdMobilenetv1Options)
+              .withFaceLandmarks();
+            console.log("ssdDetections", ssdDetections);
+
+            // Combine results
+            const combinedFaceApiDetections = mergeFaceApiDetections(
+              mtcnnDetections,
+              ssdDetections
+            );
+            console.log(
+              "Combined Face Api Detections:",
+              combinedFaceApiDetections
+            );
+
+            // Find the largest face box for manual box creation
+            if (combinedFaceApiDetections.length > 0) {
+              const largestBox = combinedFaceApiDetections.reduce(
+                (largest, detection) => {
+                  const { width, height } = detection.detection.box;
+                  return width * height > largest.width * largest.height
+                    ? detection.detection.box
+                    : largest;
+                },
+                combinedFaceApiDetections[0].detection.box
+              );
+              setLargestFaceBox(largestBox);
+            }
+
+            URL.revokeObjectURL(blobUrl);
+
+            resolve(combinedFaceApiDetections); // Resolve with the combined detections
+          } catch (error) {
+            console.error("Error during face detection:", error);
+            reject(error); // Reject the promise in case of an error
+          }
+        };
+
+        img.onerror = (err) => {
+          console.error("Error loading image for face detection:", err);
+          setIsAnalyzing(false); // Stop analyzing in case of error
+          reject(err); // Reject the promise in case of an error
+        };
       } catch (error) {
-        console.error("Error uploading image:", error);
+        console.error("Error detecting faces:", error);
+        setIsAnalyzing(false); // Stop analyzing in case of error
+        reject(error); // Reject the promise in case of an error
       }
-    } else {
-      console.log("ImagePicker was cancelled");
+    });
+  };
+
+  const callFacialRecognitionApi = async (result) => {
+    try {
+      const { uri, mimeType, fileName } = result.assets[0];
+      console.log("Creating FormData with", { uri, mimeType, fileName });
+
+      const formData = toFormData({ uri, mimeType, fileName });
+      console.log("FormData created:", formData);
+
+      const backendFaceDetections = await uploadImage(formData); // Upload as FormData
+      setFacialRecognitionApiDetections(backendFaceDetections); //to display json on screen for development
+      return backendFaceDetections;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      return null;
     }
   };
 
-  const detectFaces = async (blobUrl) => {
-    setIsAnalyzing(true); // Start analyzing
-    try {
-      if (!blobUrl) {
-        throw new Error("Image Blob URL is undefined or null");
-      }
-
+  // Helper function to load image as a Promise
+  const loadImage = (blobUrl) => {
+    return new Promise((resolve, reject) => {
       const img = new window.Image();
       img.src = blobUrl;
 
-      img.onload = async () => {
-        try {
-          console.log("Image loaded for face detection.");
-          // const options = new faceapi.TinyFaceDetectorOptions({
-          //   inputSize: 1024,
-          //   scoreThreshold: 0.4,
-          // });
-          const mtcnnOptions = new faceapi.MtcnnOptions({
-            // minFaceSize: 20,
-            // scaleFactor: 0.8,
-            // maxNumScales: 10,
-            minFaceSize: 100, // Increase for better performance
-            scaleFactor: 0.9, // Higher values improve speed but reduce accuracy
-            maxNumScales: 5, // Limit scales to control memory usage
-          });
-          const ssdMobilenetv1Options = new faceapi.SsdMobilenetv1Options({
-            minConfidence: 0.3, // Adjust this value as needed
-          });
-
-          // Run MTCNN model
-          const mtcnnDetections = await faceapi
-            .detectAllFaces(img, mtcnnOptions)
-            .withFaceLandmarks();
-          console.log("mtcnnDetections", mtcnnDetections);
-
-          // Run SsdMobilenetv1 model
-          const ssdDetections = await faceapi
-            .detectAllFaces(img, ssdMobilenetv1Options)
-            .withFaceLandmarks();
-          console.log("ssdDetections", ssdDetections);
-
-          // const detections = await faceapi
-          //   .detectAllFaces(img, mtcnnOptions)
-          //   .detectAllFaces(img, ssdMobilenetv1Options)
-          //   // .detectAllFaces(img)
-          //   .withFaceLandmarks();
-
-          // Combine results
-          const combinedDetections = mergeDetections(
-            mtcnnDetections,
-            ssdDetections
-          );
-          console.log("Detections:", combinedDetections);
-          setFaces(combinedDetections);
-          onFacesDetected(combinedDetections); // Pass detected faces to the parent component
-
-          // Find the largest face box
-          if (combinedDetections.length > 0) {
-            const largestBox = combinedDetections.reduce(
-              (largest, detection) => {
-                const { width, height } = detection.detection.box;
-                return width * height > largest.width * largest.height
-                  ? detection.detection.box
-                  : largest;
-              },
-              combinedDetections[0].detection.box
-            );
-            setLargestFaceBox(largestBox);
-          }
-
-          URL.revokeObjectURL(blobUrl);
-        } catch (error) {
-          console.error("Error during face detection:", error);
-        } finally {
-          setIsAnalyzing(false); // Stop analyzing
-        }
-      };
-
-      // Helper function to merge detections, avoiding duplicates
-      // function mergeDetections(mtcnnDetections, ssdDetections) {
-      //   const iouThreshold = 0.5; // Define IoU threshold to consider two boxes as the same
-      //   const combinedDetections = [...mtcnnDetections];
-
-      //   for (const detection of ssdDetections) {
-      //     if (
-      //       !combinedDetections.some(
-      //         (d) =>
-      //           faceapi.euclideanDistance(
-      //             d.detection.box,
-      //             detection.detection.box
-      //           ) < iouThreshold
-      //       )
-      //     ) {
-      //       combinedDetections.push(detection);
-      //     }
-      //   }
-      //   return combinedDetections;
-      // }
-
-      function mergeDetections(detections1, detections2, iouThreshold = 0.5) {
-        const mergedDetections = [...detections1];
-
-        for (const det2 of detections2) {
-          const isMerged = mergedDetections.some((det1) => {
-            const iou = calculateIoU(det1.detection.box, det2.detection.box);
-            if (iou > iouThreshold) {
-              // Merge or skip, depending on your strategy
-              return true;
-            }
-            return false;
-          });
-
-          if (!isMerged) {
-            mergedDetections.push(det2);
-          }
-        }
-
-        return mergedDetections;
-      }
-
-      function calculateIoU(boxA, boxB) {
-        const xA = Math.max(boxA.x, boxB.x);
-        const yA = Math.max(boxA.y, boxB.y);
-        const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
-        const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
-
-        // Compute the area of intersection
-        const intersectionArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
-
-        // Compute the area of both the prediction and ground-truth rectangles
-        const boxAArea = boxA.width * boxA.height;
-        const boxBArea = boxB.width * boxB.height;
-
-        // Compute the IoU
-        const iou = intersectionArea / (boxAArea + boxBArea - intersectionArea);
-
-        return iou;
-      }
-
-      img.onerror = (err) => {
-        console.error("Error loading image for face detection:", err);
-        setIsAnalyzing(false); // Stop analyzing in case of error
-      };
-    } catch (error) {
-      console.error("Error detecting faces:", error);
-      setIsAnalyzing(false); // Stop analyzing in case of error
-    }
+      img.onload = () => resolve(img);
+      img.onerror = (err) =>
+        reject(new Error("Error loading image for face detection."));
+    });
   };
 
   const handleTapToCreateBox = (event) => {
@@ -287,7 +247,7 @@ const FaceDetectionComponent = ({
     <View style={styles.container}>
       <Pressable
         style={styles.button}
-        onPress={handleImageUpload}
+        onPress={onUploadImageClick}
         disabled={isAnalyzing}
       >
         <Text style={styles.buttonText}>Upload Image</Text>
@@ -324,7 +284,8 @@ const FaceDetectionComponent = ({
             </View>
           )}
           {/* Render Recognized Faces */}
-          {faces.map((face, index) => {
+          {facesIdentityData.map((face, index) => {
+            console.log(`Render face index for ${face.backendData.firstName}`, index);
             const { x, y, width, height } = face.detection.box;
             const scaleX = imageWidth / imageDimensions.width;
             const scaleY = imageHeight / imageDimensions.height;
@@ -340,7 +301,8 @@ const FaceDetectionComponent = ({
                   border:
                     selectedFaceIndex === index //If selected make it blue
                       ? "2px solid blue"
-                      : facesIdentityData[index].isComplete
+                      : facesIdentityData[index] &&
+                        facesIdentityData[index].isComplete
                       ? "2px solid green" // Green when form data is complete
                       : "2px solid red", // Initially red until data is filled
                   cursor: "pointer",
@@ -371,9 +333,10 @@ const FaceDetectionComponent = ({
                   width: manualFace.width * scaleX,
                   height: manualFace.height * scaleY,
                   border:
-                    selectedFaceIndex === faces.length + index
+                    selectedFaceIndex === facesIdentityData.length + index
                       ? "2px solid blue" // Highlight manual face when selected
-                      : facesIdentityData[faces.length + index].isComplete
+                      : facesIdentityData[facesIdentityData.length + index]
+                          .isComplete
                       ? "2px solid green" // Green when form data is complete
                       : "2px solid orange", // Initially orange until data is filled
                   cursor: "pointer",
@@ -382,8 +345,8 @@ const FaceDetectionComponent = ({
                   //   : "rgba(255, 165, 0, 0.2)", // Orange background when incomplete
                 }}
                 onClick={() => {
-                  setSelectedFaceIndex(faces.length + index); // Set selected face index for manual face
-                  onFaceClick(faces.length + index); // Trigger onFaceClick from parent component
+                  setSelectedFaceIndex(facesIdentityData.length + index); // Set selected face index for manual face
+                  onFaceClick(facesIdentityData.length + index); // Trigger onFaceClick from parent component
                 }}
               >
                 {/* Delete Button for Manual Faces */}
@@ -413,11 +376,13 @@ const FaceDetectionComponent = ({
         </View>
       )}
       <Text>
-        {faces.length + manualFaces.length
-          ? `Faces detected: ${faces.length + manualFaces.length}`
+        {facesIdentityData.length + manualFaces.length
+          ? `Faces detected: ${facesIdentityData.length + manualFaces.length}`
           : "No faces detected"}
       </Text>
-      {uploadResponse && <Text>{JSON.stringify(uploadResponse)}</Text>}
+      {facialRecognitionApiDetections && (
+        <Text>{JSON.stringify(facialRecognitionApiDetections)}</Text>
+      )}
     </View>
   );
 };
