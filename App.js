@@ -15,7 +15,6 @@ const App = () => {
     photoContext: "", // Context of the photo
   });
   const [caption, setCaption] = useState(""); // State to store the generated caption
-  // const [recognizedFaces, setRecognizedFaces] = useState(null); // State to store recognized faces
 
   const handleFacesDetected = (detections) => {
     // Initialize form data for each detected face

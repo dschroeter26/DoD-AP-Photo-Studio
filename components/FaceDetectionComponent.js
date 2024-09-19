@@ -380,9 +380,9 @@ const FaceDetectionComponent = ({
           ? `Faces detected: ${facesIdentityData.length + manualFaces.length}`
           : "No faces detected"}
       </Text>
-      {facialRecognitionApiDetections && (
-        <Text>{JSON.stringify(facialRecognitionApiDetections)}</Text>
-      )}
+      {/* {facesIdentityData && (
+        <Text>{JSON.stringify(facesIdentityData)}</Text>
+      )} */}
     </View>
   );
 };
