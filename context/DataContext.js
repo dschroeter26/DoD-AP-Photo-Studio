@@ -1,7 +1,7 @@
 // context/DataContext.js
 
 import React, { createContext, useState, useEffect } from "react";
-import { fetchBranches, fetchRanksByBranch } from "../services/api";
+import { fetchBranches, fetchRanksByBranch } from "../services/MilitaryService";
 
 // Create a context
 export const DataContext = createContext();

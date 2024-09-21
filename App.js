@@ -8,11 +8,14 @@ const App = () => {
   const [selectedFaceIndex, setSelectedFaceIndex] = useState(null);
   const [facesData, setFacesData] = useState([]);
   const [photoDetails, setPhotoDetails] = useState({
-    date: "", // Date of the photo
-    city: "", // City location
-    state: "", // State location
-    actionDescription: "", // Description of the action in the photo
-    photoContext: "", // Context of the photo
+    date: "",
+    city: "",
+    state: "",
+    actionDescription: "",
+    photoContext: "",
+    photographerBranch: "",
+    photographerRank: "",
+    photographerName: "",
   });
   const [caption, setCaption] = useState(""); // State to store the generated caption
 
@@ -38,24 +41,30 @@ const App = () => {
   };
 
   const onFaceClick = (index) => {
-    console.log("on face click index", index);
-    setSelectedFaceIndex(index); // Set the selected face index
-    const clickedFace = facesData[index];
-    console.log("Current clicked face", clickedFace);
+    // console.log("on face click index", index);
+    setSelectedFaceIndex(index);
+    console.log("Current clicked face", facesData[index]);
   };
 
   const handleInputChange = (field, value) => {
     // Update form data for the selected face only
     setFacesData((prevFacesData) => {
       const updatedFacesData = [...prevFacesData];
+      const faceToUpdate = updatedFacesData[selectedFaceIndex];
+      faceToUpdate["backendData"][field] = value;
+
+      // updatedFacesData[selectedFaceIndex] = {
+      //   ...updatedFacesData[selectedFaceIndex],
+      //   [field]: value, // Allow spaces
+      // };
+
       updatedFacesData[selectedFaceIndex] = {
-        ...updatedFacesData[selectedFaceIndex],
-        [field]: value, // Allow spaces
+        ...faceToUpdate,
       };
 
       const isComplete = Object.values(
-        updatedFacesData[selectedFaceIndex]
-      ).every((field) => field !== "");
+        updatedFacesData[selectedFaceIndex]["backendData"]
+      ).every((field) => field !== "" || field !== null);
       updatedFacesData[selectedFaceIndex] = {
         ...updatedFacesData[selectedFaceIndex],
         isComplete: isComplete, // Allow spaces
@@ -71,6 +80,7 @@ const App = () => {
 
   const handlePhotoDetailsChange = (field, value) => {
     // Update photo details
+    console.log("Updating Photo Details", field, value);
     setPhotoDetails((prevDetails) => ({
       ...prevDetails,
       [field]: value,
@@ -79,32 +89,7 @@ const App = () => {
 
   const generateCaption = () => {
     // Function to generate AP style photo caption
-    const formattedDate = new Date(photoDetails.date).toLocaleDateString(
-      "en-US",
-      {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }
-    );
-
-    const facesDescriptions = facesData
-      .map((face) => {
-        const rank = face.rank ? `${face.rank} ` : "";
-        const name = `${face.firstName} ${face.lastName}`;
-        const unit = face.unit ? `, assigned to the ${face.unit}` : "";
-        return `${rank}${name}${unit}`;
-      })
-      .join("; ");
-
-    const caption = `${facesDescriptions} ${
-      photoDetails.actionDescription
-        ? `, ${photoDetails.actionDescription}`
-        : ""
-    } at ${photoDetails.city}, ${photoDetails.state}, on ${formattedDate}. ${
-      photoDetails.photoContext ? photoDetails.photoContext : ""
-    }`;
-
+    
     setCaption(caption); // Set the generated caption to state
   };
 
@@ -122,7 +107,7 @@ const App = () => {
           onInputChange={(field, value) => handleInputChange(field, value)} // Pass input change handler
           index={selectedFaceIndex} // Pass index
           photoDetails={photoDetails} // Pass photo details
-          onPhotoDetailsChange={handlePhotoDetailsChange} // Pass handler for photo details change
+          onPhotoDetailsChange={handlePhotoDetailsChange}
         />
       )}
       <Pressable style={styles.button} onPress={generateCaption}>

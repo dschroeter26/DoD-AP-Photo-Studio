@@ -21,7 +21,7 @@ import {
 const FaceDetectionComponent = ({
   onFacesDetected,
   onFaceClick,
-  addManualFace,
+  // addManualFace,
   facesIdentityData,
 }) => {
   const [imageUri, setImageUri] = useState(null);
@@ -75,7 +75,7 @@ const FaceDetectionComponent = ({
         const backendFaceDetections = await callFacialRecognitionApi(
           imageResult
         ); // Get backend detections
-        setFacialRecognitionApiDetections(backendFaceDetections); // Update state
+        // setFacialRecognitionApiDetections(backendFaceDetections); // Update state
 
         // Step 3: Combine both results using local variables
         const combinedDetections = combineFaceApiAndBackendDetections(
@@ -191,7 +191,7 @@ const FaceDetectionComponent = ({
       console.log("FormData created:", formData);
 
       const backendFaceDetections = await uploadImage(formData); // Upload as FormData
-      setFacialRecognitionApiDetections(backendFaceDetections); //to display json on screen for development
+      // setFacialRecognitionApiDetections(backendFaceDetections); //to display json on screen for development
       return backendFaceDetections;
     } catch (error) {
       console.error("Error uploading image:", error);
@@ -264,7 +264,7 @@ const FaceDetectionComponent = ({
                 objectFit: "contain",
                 filter: isAnalyzing ? "grayscale(100%)" : "none", // Make the image grayscale during analysis
               }}
-              onClick={handleTapToCreateBox} // Use click to create a manual box
+              // onClick={handleTapToCreateBox} // Uncomment to enable manual face addition.
             />
           ) : (
             <Image

@@ -11,12 +11,21 @@ const api = axios.create({
 
 export const uploadImage = async (imageData) => {
   try {
-    console.log(`Calling ${API_BASE_URL} with request body`, imageData);
+    console.log(`Calling ${API_BASE_URL}/upload with request body`, imageData);
     const response = await api.post('/upload', imageData);
     console.log("Response", response);
     return response.data;
   } catch (error) {
     console.error('Error uploading image:', error);
+    throw error;
+  }
+};
+
+export const captionImage = async (imageData, photoMetaData, facesData) => {
+  try {
+    console.log(`Calling ${API_BASE_URL}/caption with request body`, imageData);
+  } catch (error) {
+    console.error('Error captioning image:', error);
     throw error;
   }
 };

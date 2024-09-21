@@ -21,79 +21,48 @@ const FaceForm = ({
     }
   }, [faceData?.serviceBranch]);
 
+  useEffect(() => {
+    const selectedBranch = photoDetails?.photographerBranch;
+    if (selectedBranch) {
+      loadRanksForBranch(selectedBranch); // Load ranks when a branch is selected
+    }
+  }, [photoDetails?.photographerBranch]);
+
   const selectedBranchRanks = faceData?.serviceBranch
     ? ranksByBranch[faceData.serviceBranch] || []
+    : [];
+
+  const selectedPhotographerBranchRanks = photoDetails?.photographerBranch
+    ? ranksByBranch[photoDetails.photographerBranch] || []
     : [];
 
   return (
     <View style={styles.formContainer}>
       <Text>Face {index + 1} Information:</Text>
-
-      {/* Service Branch Select Box */}
-      {Platform.OS === "web" ? (
-        <select
-          style={styles.selectBox}
-          value={faceData?.serviceBranch || ""}
-          onChange={(e) => {
-            onInputChange("serviceBranch", e.target.value);
-            onInputChange("rank", ""); // Reset rank when service branch changes
-          }}
-        >
-          <option value="" disabled>
-            Select Service Branch
-          </option>
-          {branches.map((branch, idx) => (
-            <option key={idx} value={branch}>
-              {branch}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <Picker
-          selectedValue={faceData?.serviceBranch || ""}
-          onValueChange={(value) => {
-            onInputChange("serviceBranch", value);
-            onInputChange("rank", ""); // Reset rank when service branch changes
-          }}
-          style={styles.picker}
-        >
-          <Picker.Item label="Select Service Branch" value="" />
-          {branches.map((branch, idx) => (
-            <Picker.Item key={idx} label={branch} value={branch} />
-          ))}
-        </Picker>
-      )}
-
-      {/* Rank Select Box */}
-      {Platform.OS === "web" ? (
-        <select
-          style={styles.selectBox}
-          value={faceData?.rank || ""}
-          onChange={(e) => onInputChange("rank", e.target.value)}
-          disabled={!faceData?.serviceBranch} // Disable until a service branch is chosen
-        >
-          <option value="" disabled>
-            Select Rank
-          </option>
-          {selectedBranchRanks.map((rank, idx) => (
-            <option key={idx} value={rank.value}>
-              {rank.display}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <Picker
-          selectedValue={faceData?.rank || ""}
-          onValueChange={(value) => onInputChange("rank", value)}
-          style={styles.picker}
-          enabled={!!faceData?.serviceBranch} // Enable only if a service branch is chosen
-        >
-          <Picker.Item label="Select Rank" value="" />
-          {selectedBranchRanks.map((rank, idx) => (
-            <Picker.Item key={idx} label={rank.display} value={rank.value} />
-          ))}
-        </Picker>
-      )}
+      <Picker
+        selectedValue={faceData?.serviceBranch || ""}
+        onValueChange={(value) => {
+          onInputChange("serviceBranch", value);
+          onInputChange("rank", ""); // Reset rank when service branch changes
+        }}
+        style={styles.picker}
+      >
+        <Picker.Item label="Select Service Branch" value="" />
+        {branches.map((branch, idx) => (
+          <Picker.Item key={idx} label={branch} value={branch} />
+        ))}
+      </Picker>
+      <Picker
+        selectedValue={faceData?.rank || ""}
+        onValueChange={(value) => onInputChange("rank", value)}
+        style={styles.picker}
+        enabled={!!faceData?.serviceBranch} // Enable only if a service branch is chosen
+      >
+        <Picker.Item label="Select Rank" value="" />
+        {selectedBranchRanks.map((rank, idx) => (
+          <Picker.Item key={idx} label={rank.display} value={rank.value} />
+        ))}
+      </Picker>
 
       {/* Other Input Fields */}
       <TextInput
@@ -177,6 +146,49 @@ const FaceForm = ({
         placeholder="Context of the photo"
         value={photoDetails.photoContext}
         onChangeText={(value) => onPhotoDetailsChange("photoContext", value)}
+        multiline={true}
+        rows={4}
+      />
+      {/* Photographer Information*/}
+      {console.log("Photographer Rank", photoDetails.photographerRank)}
+      {console.log("Photographer Branch", photoDetails.photographerBranch)}
+      <Picker
+        selectedValue={photoDetails.photographerBranch || ""}
+        onValueChange={(value) => {
+          if (photoDetails.photographerBranch !== value) {
+            onPhotoDetailsChange("photographerBranch", value);
+            onPhotoDetailsChange("photographerRank", ""); // Reset rank when branch changes
+          }
+        }}
+        style={styles.picker}
+      >
+        <Picker.Item label="Select Photographer Service Branch" value="" />
+        {branches.map((branch, idx) => (
+          <Picker.Item key={idx} label={branch} value={branch} />
+        ))}
+      </Picker>
+      <Picker
+        selectedValue={photoDetails.photographerRank || ""}
+        onValueChange={(value) => {
+          if (photoDetails.photographerRank !== value) {
+            onPhotoDetailsChange("photographerRank", value);
+          }
+        }}
+        style={styles.picker}
+        enabled={!!photoDetails.photographerBranch} // Enable only if a service branch is chosen
+      >
+        <Picker.Item label="Select Photographer Rank" value="" />
+        {selectedPhotographerBranchRanks.map((rank, idx) => (
+          <Picker.Item key={idx} label={rank.display} value={rank.value} />
+        ))}
+      </Picker>
+      <TextInput
+        style={styles.input}
+        placeholder="Photographer Name"
+        value={photoDetails.photographerName}
+        onChangeText={(value) =>
+          onPhotoDetailsChange("photographerName", value)
+        }
         multiline={true}
         rows={4}
       />
