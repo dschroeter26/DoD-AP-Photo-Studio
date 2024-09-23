@@ -3,6 +3,7 @@ import { StyleSheet, ScrollView, Text, Pressable } from "react-native";
 import FaceDetectionComponent from "./components/FaceDetectionComponent";
 import FaceForm from "./components/FaceForm"; // Import FaceForm
 import { DataProvider } from "./context/DataContext"; // Import DataContext
+import { captionImage } from "./services/apiService";
 
 const App = () => {
   const [selectedFaceIndex, setSelectedFaceIndex] = useState(null);
@@ -87,10 +88,11 @@ const App = () => {
     }));
   };
 
-  const generateCaption = () => {
+  const onGenerateCaptionButtonPress = async () => {
     // Function to generate AP style photo caption
-    
-    setCaption(caption); // Set the generated caption to state
+    const captions = await captionImage(photoDetails, facesData);
+    console.log("Received Caption from backend", captions);
+    setCaption(captions); // Set the generated caption to state
   };
 
   return (
@@ -110,7 +112,7 @@ const App = () => {
           onPhotoDetailsChange={handlePhotoDetailsChange}
         />
       )}
-      <Pressable style={styles.button} onPress={generateCaption}>
+      <Pressable style={styles.button} onPress={onGenerateCaptionButtonPress}>
         <Text style={styles.buttonText}>Generate Caption</Text>
       </Pressable>
       {caption ? <Text style={styles.captionText}>{caption}</Text> : null}

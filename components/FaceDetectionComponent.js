@@ -283,7 +283,7 @@ const FaceDetectionComponent = ({
               <ActivityIndicator size="large" color="#ffffff" />
             </View>
           )}
-          {/* Render Recognized Faces */}
+          {/* Render Recognized Faces - TODO: Null check for no recognized faces.*/}
           {facesIdentityData.map((face, index) => {
             console.log(`Render face index for ${face.backendData.firstName}`, index);
             const { x, y, width, height } = face.detection.box;
